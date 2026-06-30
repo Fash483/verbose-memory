@@ -5,20 +5,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Extract ZIP
+      - name: Extract and Flatten ZIP
         shell: bash
         run: |
           set -euo pipefail
+          shopt -s dotglob nullglob
 
-          ZIP_FILE=$(find . -maxdepth 1 -name '*.zip' | head -n1)
+          # Find the zip file safely
+          ZIP_FILE=$(find . -maxdepth 1 -name '*.zip' -print -quit)
           [ -n "$ZIP_FILE" ] || { echo "No ZIP found"; exit 1; }
 
           mkdir extract_tmp
           unzip -q "$ZIP_FILE" -d extract_tmp
 
-          shopt -s dotglob nullglob
-
-          # Ignore VCS/system cruft when deciding if there's a single wrapper folder
+          # Identify true project root inside ZIP
           items=()
           for f in extract_tmp/*; do
             base=$(basename "$f")
@@ -27,22 +27,17 @@ jobs:
           done
 
           if [ ${#items[@]} -eq 1 ] && [ -d "${items[0]}" ]; then
-            echo "Single top-level folder detected."
+            echo "Single top-level folder detected: $(basename "${items[0]}")"
             SRC="${items[0]}"
           else
-            echo "No top-level folder."
+            echo "Flat root structure detected."
             SRC="extract_tmp"
           fi
 
-          # Copy instead of mv so we can safely overwrite existing files,
-          # and merge directories instead of erroring on collisions.
-          for f in "$SRC"/*; do
-            base=$(basename "$f")
-            [[ "$base" == ".git" ]] && continue
-            rm -rf "./$base"
-            cp -a "$f" "./$base"
-          done
+          # Clean up zip before moving files to avoid self-copying
+          rm -f "$ZIP_FILE"
 
-          rm -rf extract_tmp "$ZIP_FILE"
+          # Use rsync to safely merge directories and hidden files seamlessly
+          rsync -a --exclude='.git' "$SRC/" ./
 
-          shopt -u dotglob nullglob
+          rm -rf extract_tmp
