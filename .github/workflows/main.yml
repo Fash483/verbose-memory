@@ -16,39 +16,54 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          shopt -s dotglob nullglob
 
           # 1. Locate the target ZIP file
           ZIP_FILE=$(find . -maxdepth 1 -name '*.zip' -print -quit)
-          [ -n "$ZIP_FILE" ] || { echo "Error: No ZIP file found in root directory"; exit 1; }
+          [ -n "$ZIP_FILE" ] || { echo "Error: No ZIP file found"; exit 1; }
           echo "Found ZIP file: $ZIP_FILE"
 
           # 2. Setup isolated temporary directory
-          mkdir extract_tmp
+          rm -rf extract_tmp target_dir
+          mkdir extract_tmp target_dir
+          
+          # Unzip to extraction chamber
           unzip -q "$ZIP_FILE" -d extract_tmp
-
-          # 3. Scan directory items while ignoring systemic OS noise
-          items=()
-          for f in extract_tmp/*; do
-            base=$(basename "$f")
-            [[ "$base" == ".git" || "$base" == "__MACOSX" || "$base" == ".DS_Store" ]] && continue
-            items+=("$f")
-          done
-
-          # FIX: Explicitly check element index 0 for the single nested directory path
-          if [ ${#items[@]} -eq 1 ] && [ -d "${items[0]}" ]; then
-            echo "Single top-level folder detected: $(basename "${items[0]}")"
-            SRC="${items[0]}"
-          else
-            echo "Flat root structure detected."
-            SRC="extract_tmp"
-          fi
-
-          # 4. Safe housecleaning before payload transfer
           rm -f "$ZIP_FILE"
 
-          # 5. Execute synchronization and clean up
-          rsync -a --exclude='.git' "$SRC/" ./
+          # Remove system metadata junk safely
+          find extract_tmp -name "__MACOSX" -exec rm -rf {} + 2>/dev/null || true
+          find extract_tmp -name ".DS_Store" -exec rm -f {} + 2>/dev/null || true
+
+          # 3. Determine if there is a single wrapper root directory
+          # Count items at depth 1 ignoring hidden systems
+          CHILD_COUNT=$(find extract_tmp -maxdepth 1 -not -path 'extract_tmp' | wc -l)
+          FIRST_CHILD=$(find extract_tmp -maxdepth 1 -not -path 'extract_tmp' -print -quit)
+
+          if [ "$CHILD_COUNT" -eq 1 ] && [ -d "$FIRST_CHILD" ]; then
+            echo "Single top-level folder detected: $(basename "$FIRST_CHILD")"
+            # Move contents of that single nested folder to our target
+            mv "$FIRST_CHILD"/* target_dir/ 2>/dev/null || true
+            # Catch hidden dotfiles explicitly if they exist
+            shopt -s dotglob
+            mv "$FIRST_CHILD"/.* target_dir/ 2>/dev/null || true
+            shopt -u dotglob
+          else
+            echo "Flat root structure detected."
+            # Move everything from temp directly to target
+            mv extract_tmp/* target_dir/ 2>/dev/null || true
+            shopt -s dotglob
+            mv extract_tmp/.* target_dir/ 2>/dev/null || true
+            shopt -u dotglob
+          fi
+
+          # 4. Clean up workspace and dump payload directly into project root
           rm -rf extract_tmp
           
-          echo "Extraction and migration completed successfully."
+          # Deploy files to root workspace directory
+          cp -r target_dir/* ./ 2>/dev/null || true
+          shopt -s dotglob
+          cp -r target_dir/.* ./ 2>/dev/null || true
+          shopt -u dotglob
+          
+          rm -rf target_dir
+          echo "Extraction and migration completely verified."
