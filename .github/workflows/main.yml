@@ -20,7 +20,12 @@ jobs:
           # 1. Locate the target ZIP file
           ZIP_FILE=$(find . -maxdepth 1 -name '*.zip' -print -quit)
           [ -n "$ZIP_FILE" ] || { echo "Error: No ZIP file found"; exit 1; }
-          echo "Found ZIP file: $ZIP_FILE"
+          echo "=== FOUND ZIP FILE ==="
+          echo "$ZIP_FILE"
+
+          # DIAGNOSTIC 1: Print what is actually INSIDE the zip file before doing anything
+          echo "=== CONTENTS OF ZIP FILE ==="
+          unzip -l "$ZIP_FILE"
 
           # 2. Setup isolated temporary directory
           rm -rf extract_tmp target_dir
@@ -34,36 +39,29 @@ jobs:
           find extract_tmp -name "__MACOSX" -exec rm -rf {} + 2>/dev/null || true
           find extract_tmp -name ".DS_Store" -exec rm -f {} + 2>/dev/null || true
 
-          # 3. Determine if there is a single wrapper root directory
-          # Count items at depth 1 ignoring hidden systems
-          CHILD_COUNT=$(find extract_tmp -maxdepth 1 -not -path 'extract_tmp' | wc -l)
-          FIRST_CHILD=$(find extract_tmp -maxdepth 1 -not -path 'extract_tmp' -print -quit)
+          # 3. Determine structure using explicit file listing
+          shopt -s dotglob nullglob
+          items=(extract_tmp/*)
+          shopt -u dotglob nullglob
 
-          if [ "$CHILD_COUNT" -eq 1 ] && [ -d "$FIRST_CHILD" ]; then
-            echo "Single top-level folder detected: $(basename "$FIRST_CHILD")"
-            # Move contents of that single nested folder to our target
-            mv "$FIRST_CHILD"/* target_dir/ 2>/dev/null || true
-            # Catch hidden dotfiles explicitly if they exist
-            shopt -s dotglob
-            mv "$FIRST_CHILD"/.* target_dir/ 2>/dev/null || true
-            shopt -u dotglob
+          if [ ${#items[@]} -eq 1 ] && [ -d "${items[0]}" ]; then
+            SRC="${items[0]}"
+            echo "=== STRUCTURE: Single top-level folder detected: $(basename "$SRC") ==="
           else
-            echo "Flat root structure detected."
-            # Move everything from temp directly to target
-            mv extract_tmp/* target_dir/ 2>/dev/null || true
-            shopt -s dotglob
-            mv extract_tmp/.* target_dir/ 2>/dev/null || true
-            shopt -u dotglob
+            SRC="extract_tmp"
+            echo "=== STRUCTURE: Flat root structure detected ==="
           fi
 
-          # 4. Clean up workspace and dump payload directly into project root
+          # 4. Move everything to target_dir using explicit find to bypass shell wildcard bugs
+          find "$SRC" -mindepth 1 -maxdepth 1 -exec mv -t target_dir/ {} +
+
+          # 5. Clean up temp folder
           rm -rf extract_tmp
           
-          # Deploy files to root workspace directory
-          cp -r target_dir/* ./ 2>/dev/null || true
-          shopt -s dotglob
-          cp -r target_dir/.* ./ 2>/dev/null || true
-          shopt -u dotglob
-          
+          # 6. Copy safely to current working directory root
+          find target_dir -mindepth 1 -maxdepth 1 -exec cp -rp -t ./ {} +
           rm -rf target_dir
-          echo "Extraction and migration completely verified."
+          
+          # DIAGNOSTIC 2: Print exactly what files now exist in your workspace
+          echo "=== FINAL WORKSPACE CONTENTS ==="
+          ls -la
