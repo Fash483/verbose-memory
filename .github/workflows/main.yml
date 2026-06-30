@@ -1,9 +1,16 @@
+name: Extract ZIP Workflow
+
+on:
+  push:
+    branches: [ main ]
+
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
       - name: Extract and Flatten ZIP
         shell: bash
@@ -26,9 +33,9 @@ jobs:
             items+=("$f")
           done
 
-          if [ ${#items[@]} -eq 1 ] && [ -d "${items[0]}" ]; then
-            echo "Single top-level folder detected: $(basename "${items[0]}")"
-            SRC="${items[0]}"
+          if [ ${#items[@]} -eq 1 ] && [ -d "${items}" ]; then
+            echo "Single top-level folder detected: $(basename "${items}")"
+            SRC="${items}"
           else
             echo "Flat root structure detected."
             SRC="extract_tmp"
