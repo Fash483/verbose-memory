@@ -18,14 +18,16 @@ jobs:
           set -euo pipefail
           shopt -s dotglob nullglob
 
-          # Find the zip file safely
+          # 1. Locate the target ZIP file
           ZIP_FILE=$(find . -maxdepth 1 -name '*.zip' -print -quit)
-          [ -n "$ZIP_FILE" ] || { echo "No ZIP found"; exit 1; }
+          [ -n "$ZIP_FILE" ] || { echo "Error: No ZIP file found in root directory"; exit 1; }
+          echo "Found ZIP file: $ZIP_FILE"
 
+          # 2. Setup isolated temporary directory
           mkdir extract_tmp
           unzip -q "$ZIP_FILE" -d extract_tmp
 
-          # Identify true project root inside ZIP
+          # 3. Scan directory items while ignoring systemic OS noise
           items=()
           for f in extract_tmp/*; do
             base=$(basename "$f")
@@ -33,18 +35,20 @@ jobs:
             items+=("$f")
           done
 
-          if [ ${#items[@]} -eq 1 ] && [ -d "${items}" ]; then
-            echo "Single top-level folder detected: $(basename "${items}")"
-            SRC="${items}"
+          # FIX: Explicitly check element index 0 for the single nested directory path
+          if [ ${#items[@]} -eq 1 ] && [ -d "${items[0]}" ]; then
+            echo "Single top-level folder detected: $(basename "${items[0]}")"
+            SRC="${items[0]}"
           else
             echo "Flat root structure detected."
             SRC="extract_tmp"
           fi
 
-          # Clean up zip before moving files to avoid self-copying
+          # 4. Safe housecleaning before payload transfer
           rm -f "$ZIP_FILE"
 
-          # Use rsync to safely merge directories and hidden files seamlessly
+          # 5. Execute synchronization and clean up
           rsync -a --exclude='.git' "$SRC/" ./
-
           rm -rf extract_tmp
+          
+          echo "Extraction and migration completed successfully."
