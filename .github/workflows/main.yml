@@ -8,7 +8,7 @@ jobs:
       - name: Extract ZIP
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
 
           ZIP_FILE=$(find . -maxdepth 1 -name '*.zip' | head -n1)
           [ -n "$ZIP_FILE" ] || { echo "No ZIP found"; exit 1; }
@@ -17,14 +17,32 @@ jobs:
           unzip -q "$ZIP_FILE" -d extract_tmp
 
           shopt -s dotglob nullglob
-          items=(extract_tmp/*)
+
+          # Ignore VCS/system cruft when deciding if there's a single wrapper folder
+          items=()
+          for f in extract_tmp/*; do
+            base=$(basename "$f")
+            [[ "$base" == ".git" || "$base" == "__MACOSX" || "$base" == ".DS_Store" ]] && continue
+            items+=("$f")
+          done
 
           if [ ${#items[@]} -eq 1 ] && [ -d "${items[0]}" ]; then
             echo "Single top-level folder detected."
-            mv "${items[0]}"/* .
+            SRC="${items[0]}"
           else
             echo "No top-level folder."
-            mv extract_tmp/* .
+            SRC="extract_tmp"
           fi
 
-          rm -rf extract_tmp
+          # Copy instead of mv so we can safely overwrite existing files,
+          # and merge directories instead of erroring on collisions.
+          for f in "$SRC"/*; do
+            base=$(basename "$f")
+            [[ "$base" == ".git" ]] && continue
+            rm -rf "./$base"
+            cp -a "$f" "./$base"
+          done
+
+          rm -rf extract_tmp "$ZIP_FILE"
+
+          shopt -u dotglob nullglob
