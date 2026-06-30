@@ -1,19 +1,23 @@
 - name: Extract ZIP
   shell: bash
   run: |
-    ZIP_FILE=$(find . -maxdepth 1 -name "*.zip" | head -n1)
+    set -e
 
-    if [ -z "$ZIP_FILE" ]; then
-      echo "No ZIP file found."
-      exit 1
-    fi
+    ZIP_FILE=$(find . -maxdepth 1 -name '*.zip' | head -n1)
+    [ -n "$ZIP_FILE" ] || { echo "No ZIP found"; exit 1; }
 
-    TOP_LEVEL_COUNT=$(zipinfo -1 "$ZIP_FILE" | cut -d/ -f1 | sort -u | wc -l)
+    mkdir extract_tmp
+    unzip -q "$ZIP_FILE" -d extract_tmp
 
-    if [ "$TOP_LEVEL_COUNT" -eq 1 ]; then
-      echo "Removing enclosing folder..."
-      bsdtar -xf "$ZIP_FILE" --strip-components=1
+    shopt -s dotglob nullglob
+    items=(extract_tmp/*)
+
+    if [ ${#items[@]} -eq 1 ] && [ -d "${items[0]}" ]; then
+      echo "Single top-level folder detected."
+      mv "${items[0]}"/* .
     else
-      echo "Extracting normally..."
-      unzip -q "$ZIP_FILE"
+      echo "No top-level folder."
+      mv extract_tmp/* .
     fi
+
+    rm -rf extract_tmp
