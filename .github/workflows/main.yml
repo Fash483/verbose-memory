@@ -1,0 +1,19 @@
+- name: Extract ZIP
+  shell: bash
+  run: |
+    ZIP_FILE=$(find . -maxdepth 1 -name "*.zip" | head -n1)
+
+    if [ -z "$ZIP_FILE" ]; then
+      echo "No ZIP file found."
+      exit 1
+    fi
+
+    TOP_LEVEL_COUNT=$(zipinfo -1 "$ZIP_FILE" | cut -d/ -f1 | sort -u | wc -l)
+
+    if [ "$TOP_LEVEL_COUNT" -eq 1 ]; then
+      echo "Removing enclosing folder..."
+      bsdtar -xf "$ZIP_FILE" --strip-components=1
+    else
+      echo "Extracting normally..."
+      unzip -q "$ZIP_FILE"
+    fi
