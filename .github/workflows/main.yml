@@ -1,23 +1,30 @@
-- name: Extract ZIP
-  shell: bash
-  run: |
-    set -e
+jobs:
+  build:
+    runs-on: ubuntu-latest
 
-    ZIP_FILE=$(find . -maxdepth 1 -name '*.zip' | head -n1)
-    [ -n "$ZIP_FILE" ] || { echo "No ZIP found"; exit 1; }
+    steps:
+      - uses: actions/checkout@v4
 
-    mkdir extract_tmp
-    unzip -q "$ZIP_FILE" -d extract_tmp
+      - name: Extract ZIP
+        shell: bash
+        run: |
+          set -e
 
-    shopt -s dotglob nullglob
-    items=(extract_tmp/*)
+          ZIP_FILE=$(find . -maxdepth 1 -name '*.zip' | head -n1)
+          [ -n "$ZIP_FILE" ] || { echo "No ZIP found"; exit 1; }
 
-    if [ ${#items[@]} -eq 1 ] && [ -d "${items[0]}" ]; then
-      echo "Single top-level folder detected."
-      mv "${items[0]}"/* .
-    else
-      echo "No top-level folder."
-      mv extract_tmp/* .
-    fi
+          mkdir extract_tmp
+          unzip -q "$ZIP_FILE" -d extract_tmp
 
-    rm -rf extract_tmp
+          shopt -s dotglob nullglob
+          items=(extract_tmp/*)
+
+          if [ ${#items[@]} -eq 1 ] && [ -d "${items[0]}" ]; then
+            echo "Single top-level folder detected."
+            mv "${items[0]}"/* .
+          else
+            echo "No top-level folder."
+            mv extract_tmp/* .
+          fi
+
+          rm -rf extract_tmp
