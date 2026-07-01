@@ -303,7 +303,7 @@ details.mv-collapse[open] .chevron { transform:rotate(90deg); }
   max-height:55vh; overflow-y:auto;
   padding:0.5rem; display:flex; flex-direction:column; gap:0.45rem;
   list-style:none;
-  background:rgba(255,255,255,0.38);
+  background:rgba(255,255,255,0.28);
   backdrop-filter:blur(14px);
   -webkit-backdrop-filter:blur(14px);
   border-radius:var(--mv-radius);
