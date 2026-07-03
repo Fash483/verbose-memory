@@ -42,6 +42,8 @@ function stripShowName(title: string) {
   if (seMatch && seMatch.index !== undefined) name = name.slice(0, seMatch.index);
   // strip qualifiers that sometimes sit directly before the season marker
   name = name.replace(/\b(complete|repack|proper|extended|uncut|remastered|internal|multi|dual\s*audio)\b/gi, " ");
+  // strip a standalone release year (e.g. "2022") that sits between the show name and season marker
+  name = name.replace(/\b(19|20)\d{2}\b/g, " ");
   return name.replace(/\s+/g, " ").trim().toLowerCase();
 }
 function episodeKey(title: string) {
