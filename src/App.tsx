@@ -36,8 +36,12 @@ function parseSeasonEpisode(title: string) {
 function stripShowName(title: string) {
   if (!title) return "";
   let name = title.replace(/[._]+/g, " ");
+  // drop a leading release-group tag like "[RARBG]" or "(YIFY)"
+  name = name.replace(/^\s*[\[\(][^\]\)]{1,40}[\]\)]\s*/g, "");
   const seMatch = name.match(/\b(s\d{1,4}[\s._-]*e\d{1,4}|\d{1,2}x\d{1,4}|(?:s|season)[\s._-]*\d{1,4})(?!\d)/i);
   if (seMatch && seMatch.index !== undefined) name = name.slice(0, seMatch.index);
+  // strip qualifiers that sometimes sit directly before the season marker
+  name = name.replace(/\b(complete|repack|proper|extended|uncut|remastered|internal|multi|dual\s*audio)\b/gi, " ");
   return name.replace(/\s+/g, " ").trim().toLowerCase();
 }
 function episodeKey(title: string) {
