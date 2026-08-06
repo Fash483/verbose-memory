@@ -240,6 +240,7 @@ export default function App() {
   const [dedupeMode, setDedupeMode] = useState<"priority" | "first" | "last">("priority");
   const [dedupeIgnore, setDedupeIgnore] = useState("");
   const [hidePhrase, setHidePhrase] = useState("");
+  const [hideDirection, setHideDirection] = useState<"all" | "below" | "above">("all");
   const [phraseHiddenIds, setPhraseHiddenIds] = useState<Set<string>>(new Set());
 
   // filters
@@ -553,10 +554,23 @@ export default function App() {
   function handleHidePhrase() {
     const phrase = hidePhrase.trim().toLowerCase();
     if (!phrase) return pushToast("Enter a phrase first", "error");
-    const matches = allLinks.filter((l) => `${l.title} ${l.magnet}`.toLowerCase().includes(phrase));
-    if (!matches.length) return pushToast("No links match that phrase", "error");
-    setPhraseHiddenIds((h) => { const n = new Set(h); matches.forEach((l) => n.add(l.id)); return n; });
-    pushToast(`Hid ${matches.length} matching link(s)`);
+
+    if (hideDirection === "all") {
+      const matches = allLinks.filter((l) => `${l.title} ${l.magnet}`.toLowerCase().includes(phrase));
+      if (!matches.length) return pushToast("No links match that phrase", "error");
+      setPhraseHiddenIds((h) => { const n = new Set(h); matches.forEach((l) => n.add(l.id)); return n; });
+      pushToast(`Hid ${matches.length} matching link(s)`);
+      return;
+    }
+
+    // "below" / "above" cut relative to the order currently shown on screen
+    const list = filteredLinks;
+    const idx = list.findIndex((l) => `${l.title} ${l.magnet}`.toLowerCase().includes(phrase));
+    if (idx === -1) return pushToast("No links match that phrase", "error");
+
+    const toHide = hideDirection === "below" ? list.slice(idx) : list.slice(0, idx + 1);
+    setPhraseHiddenIds((h) => { const n = new Set(h); toHide.forEach((l) => n.add(l.id)); return n; });
+    pushToast(`Hid ${toHide.length} link(s) ${hideDirection === "below" ? "from that match onward" : "up to that match"}`);
   }
   function handleUnhideAll() {
     if (!phraseHiddenIds.size) return pushToast("Nothing hidden", "error");
@@ -743,12 +757,21 @@ export default function App() {
               </>
             )}
 
-            <p className="hint" style={{ marginTop: "0.85rem" }}>Hide any link whose title or URL contains a specific phrase (case-insensitive). Only matching links are hidden — nothing else changes. Refresh to restore.</p>
+            <p className="hint" style={{ marginTop: "0.85rem" }}>
+              Hide links whose title or URL contains a phrase. "This + below/above" finds the first match in the current view and hides it plus everything after/before it. Refresh to restore.
+            </p>
             <div className="add-btn-row">
               <div className="input-wrap" style={{ flex: 1 }}>
                 <input type="text" className="no-icon" value={hidePhrase} onChange={(e) => setHidePhrase(e.target.value)} placeholder="Phrase to hide (e.g. CAM)" onKeyDown={(e) => { if (e.key === "Enter") handleHidePhrase(); }} />
               </div>
-              <button className="btn" onClick={handleHidePhrase}><I.EyeOff />Hide matches</button>
+              <div className="input-wrap" style={{ flex: "0 0 auto", minWidth: "9.5rem" }}>
+                <select value={hideDirection} onChange={(e) => setHideDirection(e.target.value as any)}>
+                  <option value="all">All matches</option>
+                  <option value="below">This + below</option>
+                  <option value="above">This + above</option>
+                </select>
+              </div>
+              <button className="btn" onClick={handleHidePhrase}><I.EyeOff />{hideDirection === "all" ? "Hide matches" : "Hide"}</button>
             </div>
           </div>
         </details>
