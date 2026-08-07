@@ -46,14 +46,26 @@ function stripShowName(title: string) {
   name = name.replace(/\b(19|20)\d{2}\b/g, " ");
   return name.replace(/\s+/g, " ").trim().toLowerCase();
 }
-function episodeKey(title: string) {
-  const show = stripShowName(title);
-  const se = parseSeasonEpisode(title);
+
+// Prefer the title, but fall back to the magnet's dn= filename when the
+// title has no season/episode info we can use. This lets Sort, fuzzy
+// Dedupe, and episode-based logic work even on links with a blank or
+// mismatched title as long as the magnet's dn= carries the real filename.
+function titleForParsing(l: Link) {
+  if (parseSeasonEpisode(l.title)) return l.title;
+  const fromMagnet = parseMagnetTitle(l.magnet);
+  return fromMagnet || l.title;
+}
+
+function episodeKey(l: Link) {
+  const text = titleForParsing(l);
+  const show = stripShowName(text);
+  const se = parseSeasonEpisode(text);
   if (se) {
     const epStr = se.episode !== null ? `e${String(se.episode).padStart(2, "0")}` : "";
     return `${show}|s${String(se.season).padStart(2, "0")}${epStr}`;
   }
-  return show || title.toLowerCase().trim();
+  return show || text.toLowerCase().trim();
 }
 function splitIntoGroups(arr: Link[], splitCount: number, perGroup: number): Link[][] {
   if (perGroup && perGroup > 0) {
@@ -195,7 +207,7 @@ type LinkRowProps = {
   onDelete: (id: string) => void;
 };
 function LinkRow({ l, selected, onToggle, onCopy, onDelete }: LinkRowProps) {
-  const se = parseSeasonEpisode(l.title);
+  const se = parseSeasonEpisode(titleForParsing(l));
   const date = l.created_date ? new Date(l.created_date).toLocaleString() : "";
   return (
     <li className={`link-row${selected ? " selected" : ""}`} onClick={() => onToggle(l.id)}>
@@ -300,7 +312,8 @@ export default function App() {
       if (hiddenIds.has(l.id)) return false;
       if (phraseHiddenIds.has(l.id)) return false;
       const titleLower = (l.title || "").toLowerCase();
-      const showName = stripShowName(l.title);
+      const parseText = titleForParsing(l);
+      const showName = stripShowName(parseText);
       const searchText = `${l.title} ${l.magnet}`.toLowerCase();
       if (onlyPhrases.length && !onlyPhrases.some((p) => titleLower.includes(p))) return false;
       if (exceptPhrases.length && exceptPhrases.some((p) => titleLower.includes(p))) return false;
@@ -308,7 +321,7 @@ export default function App() {
       if (terms.length && !terms.every((t) => searchText.includes(t))) return false;
       if (orTerms.length && !orTerms.some((t) => searchText.includes(t))) return false;
       if (episodeRanges.length) {
-        const se = parseSeasonEpisode(l.title);
+        const se = parseSeasonEpisode(parseText);
         if (!episodeInRanges(se ? se.episode : null, episodeRanges)) return false;
       }
       return true;
@@ -384,10 +397,11 @@ export default function App() {
 
   function handleSort() {
     setAllLinks((prev) => [...prev].sort((a, b) => {
-      const sa = parseSeasonEpisode(a.title), sb = parseSeasonEpisode(b.title);
-      if (!sa && !sb) return a.title.localeCompare(b.title);
+      const ta = titleForParsing(a), tb = titleForParsing(b);
+      const sa = parseSeasonEpisode(ta), sb = parseSeasonEpisode(tb);
+      if (!sa && !sb) return ta.localeCompare(tb);
       if (!sa) return 1; if (!sb) return -1;
-      const sc = stripShowName(a.title).localeCompare(stripShowName(b.title));
+      const sc = stripShowName(ta).localeCompare(stripShowName(tb));
       if (sc !== 0) return sc;
       if (sa.season !== sb.season) return sa.season - sb.season;
       const epA = sa.episode !== null ? sa.episode : -1;
@@ -414,7 +428,7 @@ export default function App() {
     const scope = isFilterActive ? filteredLinks : allLinks.filter((l) => !hiddenIds.has(l.id) && !phraseHiddenIds.has(l.id));
     const groupsMap = new Map<string, Link[]>();
     for (const item of scope) {
-      const key = episodeKey(item.title);
+      const key = episodeKey(item);
       if (!groupsMap.has(key)) groupsMap.set(key, []);
       groupsMap.get(key)!.push(item);
     }
