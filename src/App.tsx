@@ -674,7 +674,7 @@ export default function App() {
         </div>
 
         {/* Actions */}
-        <div className="action-bar">
+        <div className="action-bar" style={{ flexWrap: "wrap" }}>
           <button className={`btn${copyAllPrimary ? " btn-primary" : ""}`} disabled={syncing} onClick={handleCopyAll}><I.Copy />{copyAllLabel}</button>
           <button className="btn" disabled={syncing} onClick={handleSort}><I.Sort />Sort by Episode</button>
           <button className="btn" disabled={syncing} onClick={handleSortById}><I.Sort />Sort by ID</button>
