@@ -237,6 +237,7 @@ export default function App() {
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   const [syncing, setSyncing] = useState(false);
   const [connected, setConnected] = useState(false);
+  const [copyIndex, setCopyIndex] = useState(0);
 
   const [toasts, setToasts] = useState<Toast[]>([]);
   const toastIdRef = useRef(0);
@@ -393,6 +394,14 @@ export default function App() {
     }
     if (!filteredLinks.length) return pushToast("Nothing to copy", "error");
     copyText(filteredLinks.map((l) => l.magnet).join("\n"), `Copied ${filteredLinks.length} link(s)`);
+  }
+
+  function handleCopyOneByOne() {
+    if (!filteredLinks.length) return pushToast("Nothing to copy", "error");
+    const idx = copyIndex % filteredLinks.length;
+    const l = filteredLinks[idx];
+    copyText(l.magnet, `Copied [${idx + 1}/${filteredLinks.length}] ${l.title || "(untitled)"}`);
+    setCopyIndex((prev) => prev + 1);
   }
 
   function handleSort() {
@@ -676,6 +685,7 @@ export default function App() {
         {/* Actions */}
         <div className="action-bar" style={{ flexWrap: "wrap" }}>
           <button className={`btn${copyAllPrimary ? " btn-primary" : ""}`} disabled={syncing} onClick={handleCopyAll}><I.Copy />{copyAllLabel}</button>
+          <button className="btn" disabled={syncing || !filteredLinks.length} onClick={handleCopyOneByOne}><I.Copy />Copy 1-by-1 ({filteredLinks.length ? (copyIndex % filteredLinks.length) + 1 : 0}/{filteredLinks.length})</button>
           <button className="btn" disabled={syncing} onClick={handleSort}><I.Sort />Sort by Episode</button>
           <button className="btn" disabled={syncing} onClick={handleSortById}><I.Sort />Sort by ID</button>
           <button className="btn" disabled={syncing} onClick={handleDedupe}><I.Dedupe />{dedupeLabel}</button>
